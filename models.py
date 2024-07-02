@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey, UniqueConstraint, event
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -22,16 +22,14 @@ class User(Base):
     tags = relationship("Tag", back_populates="user")
 
     @staticmethod
-    def generate_uid(email, username):
-        combined = email + username
-        hash_object = hashlib.sha256(combined.encode())
-        hex_dig = hash_object.hexdigest()
-        b64_encoded = base64.b64encode(bytes.fromhex(hex_dig)).decode()
-        return b64_encoded[:10]
+    def generate_uid(mapper, connection, target):
+        if target.email and target.username:
+            combined = target.email + target.username
+            hash_object = hashlib.sha256(combined.encode())
+            hex_dig = hash_object.hexdigest()
+            b64_encoded = base64.b64encode(bytes.fromhex(hex_dig)).decode()
+            target.uid = b64_encoded[:10]
     
-    def set_uid(self):
-        self.uid = self.generate_uid(self.email, self.username)
-
 class Team(Base):
     __tablename__ = "teams"
 
@@ -60,7 +58,7 @@ class Task(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(Integer, ForeignKey("users.user_id"))
-    team_id = Column(Integer, ForeignKey("teams.team_id"))
+    team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
 
     creator = relationship("User", back_populates="created_tasks")
     team = relationship("Team", back_populates="tasks")
@@ -79,10 +77,10 @@ class Tag(Base):
     tag_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
     user_id = Column(Integer, ForeignKey("users.user_id"))
-    team_id = Column(Integer, ForeignKey("teams.team_id"))
+    team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
 
     user = relationship("User", back_populates="tags")
-    team = relationship("Team", back_populates="tags")
+    team = relationship("Team", back_populates="tags", uselist=False)
     tasks = relationship("Task", secondary="task_tags", back_populates="tags")
 
     __table_args__ = (UniqueConstraint('name', 'user_id', 'team_id', name='uix_tag_name_user_team'),)
@@ -92,3 +90,7 @@ class TaskTag(Base):
 
     task_id = Column(Integer, ForeignKey("tasks.task_id"), primary_key=True)
     tag_id = Column(Integer, ForeignKey("tags.tag_id"), primary_key=True)
+
+
+# Event listener to generate uid before insert
+event.listen(User, 'before_insert', User.generate_uid)
