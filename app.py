@@ -227,9 +227,21 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
     db.delete(task)
     db.commit()
     return None
+
 # Create User
-#@app.post("/user", response_model=UserResponse, status_code = 200)
-#def create_user(user : UserCreate)
+@app.post("/user", response_model=UserResponse, status_code = 200)
+def create_user(user : UserCreate, db: Session = Depends(get_db)):
+    check_user = db.query(User).filter(User.email == user.email).first() 
+
+    if check_user is not None:
+        raise HTTPException(status_code=409, detail="User already exists!")
+    new_user = User(username=user.username, email=user.email)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return UserResponse.from_orm(new_user)
+
+
 # Get tasks from a specific team
 @app.get("/team-tasks/{team_id}", response_model=list[TeamTaskResponse], status_code=200)
 def get_team_tasks(team_id: int, db: Session = Depends(get_db)):

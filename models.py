@@ -14,22 +14,24 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     uid = Column(String(10), unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
 
     teams = relationship("Team", secondary="team_members", back_populates="members")
     created_tasks = relationship("Task", back_populates="creator")
     assigned_tasks = relationship("Task", secondary="task_assignees", back_populates="assignees")
     tags = relationship("Tag", back_populates="user")
-
-    @staticmethod
-    def generate_uid(target):
-        if target.email and target.username:
-            combined = target.email + target.username
+    
+    def __init__(self, email, username):
+        self.email = email
+        self.username = username
+        if self.email and self.username:
+            combined = self.email + self.username
             hash_object = hashlib.sha256(combined.encode())
             hex_dig = hash_object.hexdigest()
             b64_encoded = base64.b64encode(bytes.fromhex(hex_dig)).decode()
-            target.uid = b64_encoded[:10]
-    
+            uid = b64_encoded[:10]
+            self.uid = uid
+        
 class Team(Base):
     __tablename__ = "teams"
 
@@ -90,7 +92,3 @@ class TaskTag(Base):
 
     task_id = Column(Integer, ForeignKey("tasks.task_id"), primary_key=True)
     tag_id = Column(Integer, ForeignKey("tags.tag_id"), primary_key=True)
-
-
-# Event listener to generate uid before insert
-event.listen(User, 'before_insert', User.generate_uid)
