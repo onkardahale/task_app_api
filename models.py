@@ -22,7 +22,7 @@ class User(Base):
     tags = relationship("Tag", back_populates="user")
 
     @staticmethod
-    def generate_uid(mapper, connection, target):
+    def generate_uid(target):
         if target.email and target.username:
             combined = target.email + target.username
             hash_object = hashlib.sha256(combined.encode())
@@ -55,8 +55,8 @@ class Task(Base):
     description = Column(String)
     status = Column(String(20), nullable=False)
     due_date = Column(Date)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     created_by = Column(Integer, ForeignKey("users.user_id"))
     team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
 
