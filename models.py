@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey, UniqueConstraint, event
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -14,24 +14,24 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     uid = Column(String(10), unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
 
     teams = relationship("Team", secondary="team_members", back_populates="members")
     created_tasks = relationship("Task", back_populates="creator")
     assigned_tasks = relationship("Task", secondary="task_assignees", back_populates="assignees")
     tags = relationship("Tag", back_populates="user")
-
-    @staticmethod
-    def generate_uid(email, username):
-        combined = email + username
-        hash_object = hashlib.sha256(combined.encode())
-        hex_dig = hash_object.hexdigest()
-        b64_encoded = base64.b64encode(bytes.fromhex(hex_dig)).decode()
-        return b64_encoded[:10]
     
-    def set_uid(self):
-        self.uid = self.generate_uid(self.email, self.username)
-
+    def __init__(self, email, username):
+        self.email = email
+        self.username = username
+        if self.email and self.username:
+            combined = self.email + self.username
+            hash_object = hashlib.sha256(combined.encode())
+            hex_dig = hash_object.hexdigest()
+            b64_encoded = base64.b64encode(bytes.fromhex(hex_dig)).decode()
+            uid = b64_encoded[:10]
+            self.uid = uid
+        
 class Team(Base):
     __tablename__ = "teams"
 
@@ -57,10 +57,10 @@ class Task(Base):
     description = Column(String)
     status = Column(String(20), nullable=False)
     due_date = Column(Date)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     created_by = Column(Integer, ForeignKey("users.user_id"))
-    team_id = Column(Integer, ForeignKey("teams.team_id"))
+    team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
 
     creator = relationship("User", back_populates="created_tasks")
     team = relationship("Team", back_populates="tasks")
@@ -79,10 +79,10 @@ class Tag(Base):
     tag_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
     user_id = Column(Integer, ForeignKey("users.user_id"))
-    team_id = Column(Integer, ForeignKey("teams.team_id"))
+    team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
 
     user = relationship("User", back_populates="tags")
-    team = relationship("Team", back_populates="tags")
+    team = relationship("Team", back_populates="tags", uselist=False)
     tasks = relationship("Task", secondary="task_tags", back_populates="tags")
 
     __table_args__ = (UniqueConstraint('name', 'user_id', 'team_id', name='uix_tag_name_user_team'),)
